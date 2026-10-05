@@ -179,6 +179,32 @@ const translations = {
         , 'Нельзя поставить лайк собственной публикации.': 'You cannot like your own post.'
         , 'Слишком много действий с лайками и избранным. Повторите через 15 минут.': 'Too many like and favorite actions. Please try again in 15 minutes.'
         , 'Пока нет избранных публикаций.': 'No saved posts yet.'
+        , 'Понравившиеся': 'Popular'
+        , 'Открыть публикацию': 'Open post'
+        , 'Указанные координаты находятся далеко за пределами Марий Эл.': 'These coordinates are far outside Mari El.'
+        , 'Все': 'All'
+        , 'День': 'Day'
+        , 'Ночь': 'Night'
+        , 'Сначала новые': 'New first'
+        , 'Сначала старые': 'Old first'
+        , 'По популярности': 'Most liked'
+        , 'Найти название, описание или автора…': 'Search titles, descriptions or authors…'
+        , 'Поиск': 'Search'
+        , 'По запросу ничего не найдено.': 'Nothing matches this search.'
+        , 'Не удалось загрузить статистику профиля.': 'Could not load profile statistics.'
+        , 'Публикации': 'Posts'
+        , 'Комментарии автора': 'Comments written'
+        , 'Лайков на ваших постах': 'Likes on your posts'
+        , 'В избранном': 'Saved posts'
+        , 'Меню': 'Menu'
+        , 'Координаты: {lat}, {lng}': 'Coordinates: {lat}, {lng}'
+        , 'Посмотреть на карте': 'View on the map'
+        , 'Показать все фотографии': 'Show all photos'
+        , 'Ещё {count} фото': '{count} more photos'
+        , 'Свернуть': 'Collapse'
+        , 'Посмотреть публикацию': 'View post'
+        , 'Укажите сортировку: new, old или likes.': 'Choose a sort order: new, old or likes.'
+        , 'Поисковый запрос слишком длинный.': 'The search query is too long.'
     }
 };
 for (const key of Object.keys(translations.en)) translations.ru[key] = key;
@@ -231,7 +257,12 @@ let currentUser = null;
 let cachedPosts = [];
 let cachedComments = [];
 let cachedBans = [];
+let cachedFavorites = [];
 let adminPhotos = [];
+let activeFilter = 'auto'; // auto | day | night
+let activeSort = 'new';    // new | old | likes
+let activeSearch = '';
+let placesExpanded = false;
 const cachedPostComments = new Map();
 const commentDrafts = new Map();
 let postsRequest = 0;
@@ -329,7 +360,115 @@ function getCoordinates(latitudeInput, longitudeInput) {
     if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
         throw new Error(t('Введите корректные координаты: широту от -90 до 90 и долготу от -180 до 180.'));
     }
+    // Мягкое предупреждение: значения валидны, но явно не про Марий Эл.
+    if (lat < 55.7 || lat > 57.9 || lng < 45.5 || lng > 50.9) throw new Error(t('Указанные координаты находятся далеко за пределами Марий Эл.'));
     return { latitude: lat, longitude: lng };
+}
+
+// ── Likes / favorites / share (client state from API fields) ──
+async function toggleLike(postId) {
+    const post = cachedPosts.find(p => String(p.id) === String(postId)) ||
+        (document.getElementById('favorites-list')?.querySelector(`[data-post-id="${postId}"]`) ? { id: postId } : null);
+    const buttons = document.querySelectorAll(`.like-btn[data-post-id="${postId}"]`);
+    try {
+        const liked = Boolean(post && post.liked_by_me);
+        const res = await fetch(`/api/posts/${postId}/like`, { method: liked ? 'DELETE' : 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(translatedError(data.error) || t('Ошибка'));
+        if (post) { post.liked_by_me = data.liked ? 1 : 0; post.likes_count = data.likes_count; }
+        for (const button of buttons) {
+            button.classList.toggle('active', !liked);
+            button.setAttribute('aria-pressed', String(!liked));
+            button.title = t(liked ? 'Нравится' : 'Убрать лайк');
+            const count = button.querySelector('.like-count');
+            if (count) count.textContent = formatLikes(data.likes_count);
+        }
+    } catch (e) {
+        alert(e.message || t('Ошибка сети. Попробуйте позже.'));
+    }
+}
+
+async function toggleFavorite(postId) {
+    const post = findPostEverywhere(postId);
+    const buttons = document.querySelectorAll(`.fav-btn[data-post-id="${postId}"]`);
+    try {
+        const favorited = Boolean(post && post.favorited_by_me);
+        const res = await fetch(`/api/posts/${postId}/favorite`, { method: favorited ? 'DELETE' : 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(translatedError(data.error) || t('Ошибка'));
+        if (post) post.favorited_by_me = data.favorited ? 1 : 0;
+        for (const button of buttons) {
+            button.classList.toggle('active', !favorited);
+            button.setAttribute('aria-pressed', String(!favorited));
+            button.title = t(favorited ? 'В избранное' : 'Убрать из избранного');
+        }
+        if (favorited) loadFavorites();
+        else loadFavorites();
+    } catch (e) {
+        alert(e.message || t('Ошибка сети. Попробуйте позже.'));
+    }
+}
+
+function findPostEverywhere(postId) {
+    return cachedPosts.find(p => String(p.id) === String(postId)) ||
+        cachedFavorites.find(p => String(p.id) === String(postId));
+}
+
+async function copyPostLink(event, button) {
+    const url = postUrl(button.dataset.postId);
+    let copied = false;
+    try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(url);
+            copied = true;
+        }
+    } catch { copied = false; }
+    if (!copied) {
+        try {
+            const helper = document.createElement('textarea');
+            helper.value = url;
+            helper.setAttribute('readonly', '');
+            helper.style.position = 'fixed';
+            helper.style.opacity = '0';
+            document.body.appendChild(helper);
+            helper.select();
+            copied = document.execCommand('copy');
+            helper.remove();
+        } catch { copied = false; }
+    }
+    const field = button.closest('.post-content')?.querySelector('.share-status') ||
+        button.parentElement.querySelector('.share-status');
+    if (field) {
+        field.textContent = copied ? t('Ссылка скопирована') : t('Не удалось скопировать ссылку.');
+        setTimeout(() => { field.textContent = ''; }, 2500);
+    }
+}
+
+function renderPostActions(p) {
+    const liked = Boolean(p.liked_by_me);
+    const favorited = Boolean(p.favorited_by_me);
+    return `
+      <div class="post-actions">
+        <button type="button" class="action-btn like-btn ${liked ? 'active' : ''}" data-post-id="${p.id}" aria-pressed="${liked}" title="${escapeHtml(t(liked ? 'Убрать лайк' : 'Нравится'))}">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 20s-7-4.6-9.3-9C1 8 2.4 4.8 5.6 4.4c1.9-.2 3.4.8 4.4 2.2 1-1.4 2.5-2.4 4.4-2.2 3.2.4 4.6 3.6 2.9 6.6C19 15.4 12 20 12 20z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+          <span class="like-count">${formatLikes(p.likes_count)}</span>
+        </button>
+        <button type="button" class="action-btn fav-btn ${favorited ? 'active' : ''}" data-post-id="${p.id}" aria-pressed="${favorited}" title="${escapeHtml(t(favorited ? 'Убрать из избранного' : 'В избранное'))}">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 3h12a1 1 0 0 1 1 1v16l-7-4-7 4V4a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+          <span>${t('В избранное')}</span>
+        </button>
+        <button type="button" class="action-btn share-btn" data-post-id="${p.id}" title="${escapeHtml(t('Поделиться'))}">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 3v12m0-12L7 8m5-5 5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>${t('Поделиться')}</span>
+        </button>
+        <span class="share-status" aria-live="polite"></span>
+      </div>`;
+}
+
+function bindPostActions(root) {
+    root.querySelectorAll('.like-btn').forEach(btn => btn.addEventListener('click', () => toggleLike(btn.dataset.postId)));
+    root.querySelectorAll('.fav-btn').forEach(btn => btn.addEventListener('click', () => toggleFavorite(btn.dataset.postId)));
+    root.querySelectorAll('.share-btn').forEach(btn => btn.addEventListener('click', event => copyPostLink(event, btn)));
 }
 
 function formatLikes(count) {
@@ -380,6 +519,62 @@ async function fetchMe() {
         updateAuthUI();
     } catch (e) {
         console.error('fetchMe error', e);
+    }
+}
+
+async function loadStats() {
+    const area = document.getElementById('profile-stats');
+    if (!currentUser || !area) return;
+    try {
+        const res = await fetch('/api/stats');
+        const data = await res.json();
+        if (!res.ok) throw new Error(translatedError(data.error));
+        const stats = data.stats || {};
+        const items = [
+            ['Публикации', stats.posts],
+            ['Комментарии автора', stats.comments],
+            ['Лайков на ваших постах', stats.likes_received],
+            ['В избранном', stats.favorites]
+        ];
+        area.innerHTML = items.map(([label, value]) =>
+            `<div class="stat-chip"><strong>${Number(value) || 0}</strong><span>${t(label)}</span></div>`).join('');
+    } catch (e) {
+        area.textContent = e.message || t('Не удалось загрузить статистику профиля.');
+    }
+}
+
+async function loadFavorites() {
+    const section = document.getElementById('favorites-section');
+    const list = document.getElementById('favorites-list');
+    if (!section || !list) return;
+    if (!currentUser) {
+        cachedFavorites = [];
+        section.classList.add('hidden');
+        return;
+    }
+    try {
+        const res = await fetch('/api/favorites');
+        const data = await res.json();
+        if (!res.ok) throw new Error(translatedError(data.error));
+        cachedFavorites = data.posts || [];
+        section.classList.remove('hidden');
+        if (!cachedFavorites.length) {
+            list.innerHTML = `<div class="posts-empty">${t('Пока нет избранных публикаций.')}</div>`;
+            return;
+        }
+        list.innerHTML = cachedFavorites.map(p => `
+            <article class="post-card post-card--compact" id="fav-${p.id}" data-post-id="${p.id}">
+                <div class="post-image-wrap">${p.image_path ? `<img src="${escapeHtml(p.image_path)}" alt="${escapeHtml(p.title)}" loading="lazy" />` : `<span style="font-weight:700;color:rgba(23,32,21,0.5)">${t('Без фото')}</span>`}</div>
+                <div class="post-content">
+                    <h3 class="post-title" lang="${p.language === 'en' ? 'en' : 'ru'}">${escapeHtml(p.title)}</h3>
+                    <p class="post-desc">${escapeHtml(p.description || '')}</p>
+                    ${renderPostActions(p)}
+                </div>
+            </article>`).join('');
+        bindPostActions(list);
+    } catch (e) {
+        list.innerHTML = `<div class="posts-empty">${escapeHtml(e.message || t('Не удалось загрузить посты.'))}</div>`;
+        section.classList.remove('hidden');
     }
 }
 
@@ -615,11 +810,20 @@ async function submitComment() {
 }
 
 // ── Posts ──
+function postsQueryString() {
+    const params = new URLSearchParams();
+    if (activeFilter === 'auto') params.set('time_of_day', timeOfDay());
+    else params.set('time_of_day', activeFilter);
+    if (activeSort !== 'new') params.set('sort', activeSort);
+    if (activeSearch) params.set('search', activeSearch);
+    return params.toString();
+}
+
 async function loadPosts() {
     const request = ++postsRequest;
-    const requestedTime = timeOfDay();
+    const requestedTime = activeFilter === 'auto' ? timeOfDay() : activeFilter;
     try {
-        const res = await fetch(`/api/posts?time_of_day=${requestedTime}`);
+        const res = await fetch(`/api/posts?${postsQueryString()}`);
         const data = await res.json();
         if (!res.ok) throw new Error(translatedError(data.error));
         if (request !== postsRequest) return;
@@ -633,6 +837,7 @@ async function loadPosts() {
         updateTimeIndicator();
         renderPosts(cachedPosts);
         renderPlaces(cachedPosts);
+        renderMap(cachedPosts);
         if (animate) elements.forEach(element => element.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 220 }));
     } catch (e) {
         if (request !== postsRequest) return;
@@ -642,24 +847,66 @@ async function loadPosts() {
     document.getElementById('posts-load-error').textContent = '';
 }
 
+function setFilter(filter) {
+    if (!['auto', 'day', 'night'].includes(filter)) return;
+    activeFilter = filter;
+    document.querySelectorAll('[data-filter]').forEach(button => {
+        button.classList.toggle('active', button.dataset.filter === filter);
+    });
+    loadPosts();
+}
+
+function setSort(sort) {
+    if (!['new', 'old', 'likes'].includes(sort)) return;
+    activeSort = sort;
+    loadPosts();
+}
+
+let searchDebounce = null;
+function onSearchInput(value) {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => {
+        activeSearch = String(value || '').trim();
+        loadPosts();
+    }, 350);
+}
+
 function renderPlaces(posts) {
     const grid = document.getElementById('places-grid');
-    const withImages = posts.filter(p => p.image_path).slice(0, 6);
+    const withImages = posts.filter(p => p.image_path);
+    const visible = placesExpanded ? withImages : withImages.slice(0, 6);
 
     if (withImages.length === 0) {
         grid.innerHTML = `<div class="posts-empty" style="grid-column:1/-1">${t('Пока нет фотографий.')}</div>`;
         return;
     }
 
-    grid.innerHTML = withImages.map(p => `
-        <article class="photo-card">
-            <div class="photo-placeholder large" style="padding:0;overflow:hidden;border:none;background:none">
-                <img src="${escapeHtml(p.image_path)}" alt="${escapeHtml(p.title)}" style="width:100%;height:100%;object-fit:cover;display:block" loading="lazy" />
-            </div>
+    grid.innerHTML = visible.map((p, index) => `
+        <article class="photo-card" style="--stagger:${index % 6}">
+            <a class="photo-card-link" href="#post-${p.id}" aria-label="${escapeHtml(p.title)}">
+                <img src="${escapeHtml(p.image_path)}" alt="${escapeHtml(p.title)}" loading="lazy" />
+                <span class="photo-card-overlay"><span>${t('Посмотреть публикацию')}</span></span>
+            </a>
             <h3 lang="${p.language === 'en' ? 'en' : 'ru'}">${escapeHtml(p.title)}</h3>
             <p lang="${p.description ? p.language : currentLanguage}">${escapeHtml(p.description || t('Фотография Республики Марий Эл.'))}</p>
         </article>
     `).join('');
+
+    let moreButton = document.getElementById('places-more');
+    if (withImages.length > 6) {
+        if (!moreButton) {
+            moreButton = document.createElement('button');
+            moreButton.id = 'places-more';
+            moreButton.type = 'button';
+            moreButton.className = 'btn-small btn-secondary places-more';
+            moreButton.addEventListener('click', () => { placesExpanded = !placesExpanded; renderPlaces(cachedPosts); });
+            grid.parentElement.appendChild(moreButton);
+        }
+        moreButton.textContent = placesExpanded ? t('Свернуть') : t('Ещё {count} фото', { count: withImages.length - 6 });
+        moreButton.classList.remove('hidden');
+    } else if (moreButton) {
+        moreButton.classList.add('hidden');
+    }
 }
 
 function renderPosts(posts) {

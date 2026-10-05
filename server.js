@@ -311,6 +311,20 @@ app.get('/api/me', (req, res) => {
     });
 });
 
+// Profile statistics for the logged-in user
+app.get('/api/stats', requireAuth, (req, res) => {
+    const userId = req.session.userId;
+    const scalar = (sql, ...params) => db.prepare(sql).get(...params).count;
+    res.json({
+        stats: {
+            posts: scalar('SELECT COUNT(*) AS count FROM posts WHERE user_id = ?', userId),
+            comments: scalar('SELECT COUNT(*) AS count FROM post_comments WHERE user_id = ?', userId),
+            likes_received: scalar('SELECT COUNT(*) AS count FROM likes l JOIN posts p ON p.id = l.post_id WHERE p.user_id = ?', userId),
+            favorites: scalar('SELECT COUNT(*) AS count FROM favorites WHERE user_id = ?', userId)
+        }
+    });
+});
+
 // Register
 app.post('/api/register', (req, res) => {
     const { username, password, display_name } = req.body;
@@ -483,8 +497,20 @@ app.get('/api/posts', (req, res) => {
     if (timeOfDay !== undefined && !['day', 'night'].includes(timeOfDay)) {
         return res.status(400).json({ error: 'Укажите время суток: day или night.' });
     }
+    const sort = req.query.sort;
+    if (sort !== undefined && !['new', 'old', 'likes'].includes(sort)) {
+        return res.status(400).json({ error: 'Укажите сортировку: new, old или likes.' });
+    }
+    const search = typeof req.query.search === 'string' ? req.query.search.trim().toLowerCase() : '';
+    if (search.length > 200) return res.status(400).json({ error: 'Поисковый запрос слишком длинный.' });
     const viewerId = Number(req.session.userId) || 0;
-    const posts = db.prepare(postSelect()).all(viewerId, viewerId);
+    let posts = db.prepare(postSelect()).all(viewerId, viewerId);
+    if (search) {
+        posts = posts.filter(post => [post.title, post.description, post.display_name, post.username]
+            .some(value => typeof value === 'string' && value.toLowerCase().includes(search)));
+    }
+    if (sort === 'old') posts = [...posts].sort((a, b) => a.id - b.id);
+    else if (sort === 'likes') posts = [...posts].sort((a, b) => b.likes_count - a.likes_count || b.id - a.id);
     const selected = timeOfDay ? posts.filter(post => post.is_night === Number(timeOfDay === 'night')) : posts;
     res.json({ posts: selected.length ? selected : posts, time_of_day: timeOfDay || null, fallback: Boolean(timeOfDay && posts.length && !selected.length) });
 });

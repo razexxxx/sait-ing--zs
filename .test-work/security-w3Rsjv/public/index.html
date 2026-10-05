@@ -1,0 +1,334 @@
+﻿<!doctype html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title data-i18n="Республика Марий Эл">Республика Марий Эл</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIINfQ8Ww2at2E09QyFjQf3zWmC75S0z9xw=" crossorigin="" />
+    <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+    <div class="ambient ambient--one"></div>
+    <div class="ambient ambient--two"></div>
+
+    <header class="hero">
+        <nav class="topbar container">
+            <p class="logo" data-i18n="Марий Эл">Марий Эл</p>
+            <div class="topbar-links">
+                <div class="language-switch" role="group" aria-label="Язык интерфейса" data-i18n-aria-label="Язык интерфейса">
+                    <button type="button" data-language="ru" aria-pressed="true">RU</button>
+                    <button type="button" data-language="en" aria-pressed="false">EN</button>
+                </div>
+                <a class="topbar-link" href="#about" data-i18n="О республике">О республике</a>
+                <a class="topbar-link" href="#posts" data-i18n="Посты">Посты</a>
+                <a class="topbar-link" href="#comments" data-i18n="Комментарии">Комментарии</a>
+                <button id="admin-btn" class="topbar-link auth-btn hidden" data-i18n="Админ-панель">Админ-панель</button>
+                <button id="auth-btn" class="topbar-link auth-btn">Войти</button>
+            </div>
+        </nav>
+
+        <div class="hero-content container">
+            <p class="hero-kicker" data-i18n="Добро пожаловать">Добро пожаловать</p>
+            <h1 data-i18n="Республика Марий Эл">Республика Марий Эл</h1>
+            <p class="hero-text" data-i18n="Край лесов, озер и богатой культуры народа мари. Этот сайт станет красивой визитной карточкой региона.">
+                Край лесов, озер и богатой культуры народа мари. Этот сайт станет красивой визитной карточкой региона.
+            </p>
+            <a class="hero-btn" href="#places" data-i18n="Смотреть разделы">Смотреть разделы</a>
+            <p id="time-indicator" class="time-indicator" role="status" aria-live="polite"></p>
+            <p id="time-fallback" class="time-note hidden"></p>
+        </div>
+    </header>
+
+    <main>
+        <section id="about" class="section container reveal">
+            <div class="section-head">
+                <p class="section-tag" data-i18n="О регионе">О регионе</p>
+                <h2 data-i18n="Что важно знать о Марий Эл">Что важно знать о Марий Эл</h2>
+            </div>
+            <div class="grid two-col">
+                <article class="card">
+                    <h3 data-i18n="Столица">Столица</h3>
+                    <p data-i18n="Йошкар-Ола - город с необычной архитектурой, набережными и уютными площадями.">Йошкар-Ола - город с необычной архитектурой, набережными и уютными площадями.</p>
+                </article>
+                <article class="card">
+                    <h3 data-i18n="Природа">Природа</h3>
+                    <p data-i18n="Здесь много лесов, чистых рек и озер. Регион славится спокойными и живописными маршрутами.">Здесь много лесов, чистых рек и озер. Регион славится спокойными и живописными маршрутами.</p>
+                </article>
+            </div>
+        </section>
+
+        <section id="places" class="section container reveal">
+            <div class="section-head">
+                <p class="section-tag" data-i18n="Интересные места">Интересные места</p>
+                <h2 data-i18n="Красивые места республики">Красивые места республики</h2>
+            </div>
+            <div id="places-grid" class="grid three-col">
+                <!-- Photos loaded via JS from posts -->
+            </div>
+        </section>
+
+        <section id="map-section" class="section container reveal">
+            <div class="section-head"><p class="section-tag" data-i18n="Маршрут">Маршрут</p><h2 data-i18n="Карта красивых мест">Карта красивых мест</h2></div>
+            <p id="map-note" class="field-note"></p>
+            <div id="places-map" class="places-map" role="application" aria-label="Карта красивых мест" data-i18n-aria-label="Карта красивых мест"></div>
+        </section>
+
+        <section id="posts" class="section container reveal">
+            <div class="section-head">
+                <p class="section-tag" data-i18n="Пользователи">Пользователи</p>
+                <h2 data-i18n="Фотографии и посты">Фотографии и посты</h2>
+            </div>
+
+            <div id="post-form-area" class="post-form-area hidden">
+                <div class="post-form-card">
+                    <h3 data-i18n="Добавить фото / пост">Добавить фото / пост</h3>
+                    <div class="form-group">
+                        <label for="post-language" data-i18n="Язык публикации">Язык публикации</label>
+                        <select id="post-language"><option value="ru" data-i18n="Русский">Русский</option><option value="en" data-i18n="Английский">Английский</option></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="post-title" data-i18n="Название">Название</label>
+                        <input type="text" id="post-title" placeholder="Например: Озеро в Марий Эл" data-i18n-placeholder="Например: Озеро в Марий Эл" />
+                    </div>
+                    <div class="form-group">
+                        <label for="post-description" data-i18n="Описание">Описание</label>
+                        <textarea id="post-description" rows="3" placeholder="Расскажите о месте..." data-i18n-placeholder="Расскажите о месте..."></textarea>
+                    </div>
+                    <div class="coordinates-grid">
+                        <div class="form-group"><label for="post-latitude" data-i18n="Широта">Широта</label><input id="post-latitude" type="number" min="-90" max="90" step="any" inputmode="decimal" placeholder="56.63" /></div>
+                        <div class="form-group"><label for="post-longitude" data-i18n="Долгота">Долгота</label><input id="post-longitude" type="number" min="-180" max="180" step="any" inputmode="decimal" placeholder="47.89" /></div>
+                    </div>
+                    <p class="field-note" data-i18n="Координаты необязательны. Укажите оба значения, чтобы добавить место на карту.">Координаты необязательны. Укажите оба значения, чтобы добавить место на карту.</p>
+                    <div class="form-group">
+                        <label for="post-image" data-i18n="Фотография">Фотография</label>
+                        <div class="file-picker">
+                            <input type="file" id="post-image" class="visually-hidden" accept="image/jpeg,image/png,.jpg,.jpeg,.png" />
+                            <label for="post-image" class="btn-small btn-secondary" data-i18n="Выбрать фотографию">Выбрать фотографию</label>
+                            <span id="post-file-name" aria-live="polite">Файл не выбран</span>
+                        </div>
+                        <small data-i18n="JPEG или PNG, не более 5 МБ.">JPEG или PNG, не более 5 МБ.</small>
+                        <div id="post-image-preview" class="post-image-preview"></div>
+                    </div>
+                    <div id="post-error" class="login-error"></div>
+                    <div class="comment-actions">
+                        <button id="submit-post" class="hero-btn" data-i18n="Опубликовать">Опубликовать</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="guest-post-hint" class="guest-comment-hint">
+                <p><a href="#" id="show-login-from-post" data-i18n="Войдите">Войдите</a><span data-i18n=", чтобы публиковать посты с фотографиями.">, чтобы публиковать посты с фотографиями.</span></p>
+            </div>
+
+            <p id="posts-load-error" class="login-error" role="alert"></p>
+            <div id="posts-list" class="posts-list">
+                <!-- Posts loaded via JS -->
+            </div>
+        </section>
+
+        <section id="favorites-section" class="section container reveal hidden">
+            <div class="section-head"><p class="section-tag" data-i18n="Личный кабинет">Личный кабинет</p><h2 data-i18n="Моё избранное">Моё избранное</h2></div>
+            <div id="favorites-list" class="posts-list"></div>
+        </section>
+
+        <section id="admin-panel" class="section container reveal hidden">
+            <div class="section-head">
+                <p class="section-tag" data-i18n="Управление">Управление</p>
+                <h2 data-i18n="Админ-панель">Админ-панель</h2>
+            </div>
+
+            <div class="admin-tabs">
+                <button type="button" class="admin-tab active" data-admin-tab="bans" data-i18n="Баны">Баны</button>
+                <button type="button" class="admin-tab" data-admin-tab="users" data-i18n="Пользователи">Пользователи</button>
+                <button type="button" class="admin-tab" data-admin-tab="photos" data-i18n="День / Ночь">День / Ночь</button>
+            </div>
+
+            <div id="admin-bans" class="admin-section">
+                <h3 data-i18n="Заблокировать пользователя">Заблокировать пользователя</h3>
+                <div class="ban-form">
+                    <div class="form-group">
+                        <label for="ban-user-select" data-i18n="Пользователь">Пользователь</label>
+                        <select id="ban-user-select"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="ban-reason" data-i18n="Причина">Причина</label>
+                        <input type="text" id="ban-reason" placeholder="Например: Спам" data-i18n-placeholder="Например: Спам" />
+                    </div>
+                    <div class="form-group">
+                        <label for="ban-duration" data-i18n="Длительность (минут, пусто — навсегда)">Длительность (минут, пусто — навсегда)</label>
+                        <input type="number" id="ban-duration" placeholder="60" min="1" />
+                    </div>
+                    <div id="ban-error" class="login-error"></div>
+                    <button id="submit-ban" class="hero-btn" style="width:auto" data-i18n="Забанить">Забанить</button>
+                </div>
+
+                <h3 style="margin-top:2rem" data-i18n="Активные баны">Активные баны</h3>
+                <div id="bans-list" class="bans-list">
+                    <!-- loaded via JS -->
+                </div>
+            </div>
+
+            <div id="admin-users" class="admin-section hidden">
+                <h3 data-i18n="Список пользователей">Список пользователей</h3>
+                <div id="users-list" class="bans-list">
+                    <!-- loaded via JS -->
+                </div>
+            </div>
+            <div id="admin-photos" class="admin-section hidden">
+                <h3 data-i18n="Настройка фотографий">Настройка фотографий</h3>
+                <p data-i18n="Все публикации, независимо от времени суток. Откройте редактирование, чтобы выбрать Авто, Дневное или Ночное.">Все публикации, независимо от времени суток. Откройте редактирование, чтобы выбрать Авто, Дневное или Ночное.</p>
+                <div id="admin-photo-list" class="bans-list"></div>
+            </div>
+        </section>
+
+        <section id="comments" class="section container reveal">
+            <div class="section-head">
+                <p class="section-tag" data-i18n="Сообщество">Сообщество</p>
+                <h2 data-i18n="Комментарии посетителей">Комментарии посетителей</h2>
+            </div>
+
+            <div class="comments-wrapper">
+                <div id="comment-form-area" class="comment-form-area hidden">
+                    <div class="comment-user-badge">
+                        <span class="comment-user-name" id="current-user-name"></span>
+                        <span class="comment-user-role" id="current-user-role"></span>
+                    </div>
+                    <textarea id="comment-text" class="comment-textarea" placeholder="Напишите ваш комментарий..." data-i18n-placeholder="Напишите ваш комментарий..."></textarea>
+                    <label for="comment-language" data-i18n="Язык комментария">Язык комментария</label>
+                    <select id="comment-language"><option value="ru" data-i18n="Русский">Русский</option><option value="en" data-i18n="Английский">Английский</option></select>
+                    <div class="comment-actions">
+                        <button id="submit-comment" class="hero-btn" data-i18n="Отправить комментарий">Отправить комментарий</button>
+                    </div>
+                </div>
+
+                <div id="guest-comment-hint" class="guest-comment-hint">
+                    <p><a href="#" id="show-login-from-hint" data-i18n="Войдите">Войдите</a><span data-i18n=", чтобы оставлять комментарии.">, чтобы оставлять комментарии.</span></p>
+                </div>
+
+                <div id="comments-list" class="comments-list">
+                    <!-- Comments loaded via JS -->
+                </div>
+            </div>
+        </section>
+
+        <section class="section container reveal">
+            <div class="section-head">
+                <p class="section-tag" data-i18n="Культура">Культура</p>
+                <h2 data-i18n="Традиции и народное наследие">Традиции и народное наследие</h2>
+            </div>
+            <article class="wide-card">
+                <p data-i18n="В Марий Эл бережно сохраняют язык, музыку, народные костюмы и праздники. Здесь можно почувствовать связь современной жизни с глубокими традициями.">
+                    В Марий Эл бережно сохраняют язык, музыку, народные костюмы и праздники. Здесь можно почувствовать связь современной жизни с глубокими традициями.
+                </p>
+            </article>
+        </section>
+    </main>
+
+    <footer class="footer container">
+        <p data-i18n="Сайт о Республике Марий Эл">Сайт о Республике Марий Эл</p>
+        <p data-i18n="Позже добавим ваши фотографии и подписи.">Позже добавим ваши фотографии и подписи.</p>
+    </footer>
+
+    <!-- Auth Modal -->
+    <div id="login-modal" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <button class="modal-close" id="modal-close" aria-label="Закрыть" data-i18n-aria-label="Закрыть">&times;</button>
+
+            <div class="auth-tabs">
+                <button type="button" class="auth-tab active" data-tab="login" data-i18n="Вход">Вход</button>
+                <button type="button" class="auth-tab" data-tab="register" data-i18n="Регистрация">Регистрация</button>
+            </div>
+
+            <!-- Login Form -->
+            <form id="login-form" class="login-form">
+                <div class="form-group">
+                    <label for="login-username" data-i18n="Логин">Логин</label>
+                    <input type="text" id="login-username" name="username" autocomplete="username" required />
+                </div>
+                <div class="form-group">
+                    <label for="login-password" data-i18n="Пароль">Пароль</label>
+                    <input type="password" id="login-password" name="password" autocomplete="current-password" required />
+                </div>
+                <div id="login-error" class="login-error"></div>
+                <button type="submit" class="hero-btn login-submit" data-i18n="Войти">Войти</button>
+            </form>
+
+            <!-- Register Form -->
+            <form id="register-form" class="login-form hidden">
+                <div class="form-group">
+                    <label for="reg-username" data-i18n="Логин">Логин</label>
+                    <input type="text" id="reg-username" name="username" autocomplete="username" required minlength="3" maxlength="30" />
+                </div>
+                <div class="form-group">
+                    <label for="reg-display-name" data-i18n="Имя (как вас видят другие)">Имя (как вас видят другие)</label>
+                    <input type="text" id="reg-display-name" name="display_name" autocomplete="name" />
+                </div>
+                <div class="form-group">
+                    <label for="reg-password" data-i18n="Пароль">Пароль</label>
+                    <input type="password" id="reg-password" name="password" autocomplete="new-password" required minlength="4" />
+                </div>
+                <div class="form-group">
+                    <label for="reg-password-confirm" data-i18n="Подтвердите пароль">Подтвердите пароль</label>
+                    <input type="password" id="reg-password-confirm" autocomplete="new-password" required />
+                </div>
+                <div id="register-error" class="login-error"></div>
+                <button type="submit" class="hero-btn login-submit" data-i18n="Создать аккаунт">Создать аккаунт</button>
+            </form>
+
+            <div class="login-hint">
+                <p><strong data-i18n="Демо-пользователи:">Демо-пользователи:</strong></p>
+                <ul>
+                    <li><code>admin</code> / <code>admin123</code> <span data-i18n="— Администратор">— Администратор</span></li>
+                    <li><code>user1</code> / <code>user123</code> <span data-i18n="— Пользователь">— Пользователь</span></li>
+                    <li><code>user2</code> / <code>user456</code> <span data-i18n="— Пользователь">— Пользователь</span></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Post Modal -->
+    <div id="edit-post-modal" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <button class="modal-close" id="edit-modal-close" aria-label="Закрыть" data-i18n-aria-label="Закрыть">&times;</button>
+            <h3 class="modal-title" data-i18n="Редактировать пост">Редактировать пост</h3>
+            <form id="edit-post-form" class="login-form">
+                <input type="hidden" id="edit-post-id" />
+                <div class="form-group">
+                    <label for="edit-post-title" data-i18n="Название">Название</label>
+                    <input type="text" id="edit-post-title" required />
+                </div>
+                <div class="form-group">
+                    <label for="edit-post-description" data-i18n="Описание">Описание</label>
+                    <textarea id="edit-post-description" rows="3"></textarea>
+                </div>
+                <div class="coordinates-grid">
+                    <div class="form-group"><label for="edit-post-latitude" data-i18n="Широта">Широта</label><input id="edit-post-latitude" type="number" min="-90" max="90" step="any" inputmode="decimal" /></div>
+                    <div class="form-group"><label for="edit-post-longitude" data-i18n="Долгота">Долгота</label><input id="edit-post-longitude" type="number" min="-180" max="180" step="any" inputmode="decimal" /></div>
+                </div>
+                <div id="edit-post-error" class="login-error"></div>
+                <div class="form-group">
+                    <label for="edit-post-language" data-i18n="Язык публикации">Язык публикации</label>
+                    <select id="edit-post-language"><option value="ru" data-i18n="Русский">Русский</option><option value="en" data-i18n="Английский">Английский</option></select>
+                </div>
+                <div class="form-group">
+                    <label for="edit-night-mode" data-i18n="Время суток на фотографии">Время суток на фотографии</label>
+                    <select id="edit-night-mode"><option value="auto" data-i18n="Авто">Авто</option><option value="day" data-i18n="Дневное">Дневное</option><option value="night" data-i18n="Ночное">Ночное</option></select>
+                    <small data-i18n="Авто: средняя яркость ниже 80 из 255 означает ночное фото.">Авто: средняя яркость ниже 80 из 255 означает ночное фото.</small>
+                </div>
+                <button type="submit" class="hero-btn login-submit" data-i18n="Сохранить">Сохранить</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+oH4QOZon2iof9bM=" crossorigin=""></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
